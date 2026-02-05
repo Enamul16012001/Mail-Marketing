@@ -55,31 +55,6 @@ docker compose up --build -d
 - **Frontend**: http://localhost:5173
 - **API Docs**: http://localhost:8020/docs
 
-## Docker Commands Reference
-
-```bash
-# Start in background
-docker compose up -d
-
-# Start with live logs
-docker compose up
-
-# Rebuild images
-docker compose build
-
-# Stop all containers
-docker compose down
-
-# Stop and remove volumes (reset data)
-docker compose down -v
-
-# View backend logs only
-docker compose logs -f backend
-
-# Restart a specific service
-docker compose restart backend
-```
-
 ## Manual Setup (without Docker)
 
 ```bash
