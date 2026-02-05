@@ -19,6 +19,7 @@ export const getEmail = (id) => api.get(`/emails/${id}`);
 export const replyToEmail = (id, response) => api.post(`/emails/reply/${id}`, { response });
 export const dismissEmail = (id) => api.delete(`/emails/${id}`);
 export const triggerProcessing = () => api.post('/emails/process');
+export const composeEmail = (data) => api.post('/emails/compose', data);
 
 // Drafts
 export const getPendingDrafts = () => api.get('/drafts');

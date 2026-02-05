@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 from datetime import datetime
 
-from models.schemas import Email, EmailReply, EmailStatus
+from models.schemas import Email, EmailReply, EmailStatus, ComposeEmail
 from services.gmail_service import get_gmail_service
 from database import get_database
 
@@ -119,3 +119,30 @@ async def dismiss_email(email_id: str):
     db.update_email_status(email_id, EmailStatus.REPLIED, "[Dismissed by user]")
 
     return {"success": True}
+
+
+@router.post("/compose")
+async def compose_and_send_email(compose: ComposeEmail):
+    """Compose and send a new email with To, CC, and BCC support."""
+    gmail = get_gmail_service()
+
+    if not compose.to:
+        raise HTTPException(status_code=400, detail="At least one recipient is required")
+
+    if not compose.body:
+        raise HTTPException(status_code=400, detail="Email body is required")
+
+    message_id = gmail.send_composed_email(compose)
+
+    if not message_id:
+        raise HTTPException(status_code=500, detail="Failed to send email")
+
+    return {
+        "success": True,
+        "message_id": message_id,
+        "recipients": {
+            "to": compose.to,
+            "cc": compose.cc,
+            "bcc": compose.bcc
+        }
+    }

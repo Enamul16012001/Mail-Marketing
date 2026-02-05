@@ -50,6 +50,14 @@ class EmailReply(BaseModel):
     message_id: Optional[str] = None  # For replying to specific message
 
 
+class ComposeEmail(BaseModel):
+    to: List[str]  # Multiple recipients
+    cc: List[str] = []  # CC recipients
+    bcc: List[str] = []  # BCC recipients
+    subject: str
+    body: str
+
+
 class Draft(BaseModel):
     id: str
     email_id: str

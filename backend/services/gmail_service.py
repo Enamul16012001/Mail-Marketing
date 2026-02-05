@@ -14,7 +14,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from config import GMAIL_CREDENTIALS_PATH, GMAIL_TOKEN_PATH, GMAIL_SCOPES
-from models.schemas import Email, EmailAttachment, EmailReply
+from models.schemas import Email, EmailAttachment, EmailReply, ComposeEmail
 
 
 class GmailService:
@@ -228,6 +228,39 @@ class GmailService:
         )
 
         return self.send_email(reply)
+
+    def send_composed_email(self, compose: ComposeEmail) -> Optional[str]:
+        """Send a composed email with CC/BCC support."""
+        try:
+            message = MIMEMultipart("alternative")
+            message["From"] = self.user_email
+            message["To"] = ", ".join(compose.to)
+            message["Subject"] = compose.subject
+
+            if compose.cc:
+                message["Cc"] = ", ".join(compose.cc)
+
+            if compose.bcc:
+                message["Bcc"] = ", ".join(compose.bcc)
+
+            # Add plain text body
+            text_part = MIMEText(compose.body, "plain")
+            message.attach(text_part)
+
+            # Encode and send
+            encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            create_message = {"raw": encoded_message}
+
+            sent_message = self.service.users().messages().send(
+                userId="me",
+                body=create_message
+            ).execute()
+
+            return sent_message.get("id")
+
+        except HttpError as error:
+            print(f"Error sending composed email: {error}")
+            return None
 
     def create_draft(self, reply: EmailReply) -> Optional[str]:
         """Create a draft email."""

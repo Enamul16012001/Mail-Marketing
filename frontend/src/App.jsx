@@ -5,15 +5,18 @@ import {
   FolderIcon,
   Cog6ToothIcon,
   ChartBarIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 import Dashboard from './components/Dashboard';
 import EmailList from './components/EmailList';
 import DraftReview from './components/DraftReview';
 import KnowledgeBase from './components/KnowledgeBase';
 import EmailHistory from './components/EmailHistory';
+import EmailComposer from './components/EmailComposer';
 
 const navigation = [
   { name: 'Dashboard', icon: ChartBarIcon, id: 'dashboard' },
+  { name: 'Compose', icon: PencilSquareIcon, id: 'compose' },
   { name: 'Pending Emails', icon: EnvelopeIcon, id: 'pending' },
   { name: 'Draft Review', icon: DocumentTextIcon, id: 'drafts' },
   { name: 'Knowledge Base', icon: FolderIcon, id: 'knowledge' },
@@ -27,6 +30,8 @@ function App() {
     switch (currentTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'compose':
+        return <EmailComposer />;
       case 'pending':
         return <EmailList />;
       case 'drafts':
