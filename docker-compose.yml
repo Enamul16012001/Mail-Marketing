@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8020:8020"
+    volumes:
+      # Mount credentials for Gmail API
+      - ./credentials.json:/app/credentials.json:ro
+      - ./token.json:/app/token.json
+      # Persist data
+      - ./backend/knowledge_base:/app/knowledge_base
+      - ./backend/chroma_db:/app/chroma_db
+      - backend_data:/app/data
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GMAIL_CREDENTIALS_PATH=/app/credentials.json
+      - GMAIL_TOKEN_PATH=/app/token.json
+      - POLLING_INTERVAL_MINUTES=3
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://backend:8020
+    restart: unless-stopped
+
+volumes:
+  backend_data:
+
+networks:
+  default:
+    name: email-auto-reply-network

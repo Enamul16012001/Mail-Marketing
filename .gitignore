@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Credentials (IMPORTANT: Never commit these!)
+credentials.json
+token.json
+
+# Database
+*.db
+*.sqlite3
+
+# ChromaDB data
+chroma_db/
+backend/chroma_db/
+
+# Knowledge base uploads
+backend/knowledge_base/*
+!backend/knowledge_base/.gitkeep
+
+# Data directory
+backend/data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker
+.docker/
+
+# Build outputs
+frontend/dist/
+
+# Temporary files
+*.tmp
+*.temp
