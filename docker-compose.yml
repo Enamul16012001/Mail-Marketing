@@ -6,17 +6,16 @@ services:
     ports:
       - "8020:8020"
     volumes:
-      # Mount credentials for Gmail API
-      - ./credentials.json:/app/credentials.json:ro
-      - ./token.json:/app/token.json
+      # Mount credentials folder for Gmail API
+      - ./credentials:/app/credentials
       # Persist data
       - ./backend/knowledge_base:/app/knowledge_base
       - ./backend/chroma_db:/app/chroma_db
       - backend_data:/app/data
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GMAIL_CREDENTIALS_PATH=/app/credentials.json
-      - GMAIL_TOKEN_PATH=/app/token.json
+      - GMAIL_CREDENTIALS_PATH=/app/credentials/credentials.json
+      - GMAIL_TOKEN_PATH=/app/credentials/token.json
       - POLLING_INTERVAL_MINUTES=3
       - CHROMA_PERSIST_DIR=/app/chroma_db
     restart: unless-stopped

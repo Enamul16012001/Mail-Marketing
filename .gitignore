@@ -26,6 +26,7 @@ yarn-error.log*
 # Credentials (IMPORTANT: Never commit these!)
 credentials.json
 token.json
+credentials/
 
 # Database
 *.db
