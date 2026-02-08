@@ -13,7 +13,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 class AIService:
     def __init__(self):
         self.model = genai.GenerativeModel("gemini-2.5-flash")
-        self.embedding_model = "models/embedding-001"
+        self.embedding_model = "models/gemini-embedding-001"
 
     def classify_email(self, email: Email) -> ClassificationResult:
         """Classify an email into one of four categories."""
