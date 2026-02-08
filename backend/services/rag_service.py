@@ -2,6 +2,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 import chromadb
 import PyPDF2
 from docx import Document
@@ -147,10 +148,12 @@ class RAGService:
         file_info = {
             "id": file_id,
             "filename": filename,
+            "file_path": str(file_path),
             "file_type": Path(filename).suffix.lower(),
             "file_size": os.path.getsize(file_path),
             "chunk_count": len(chunks),
-            "chunk_ids": chunk_ids
+            "chunk_ids": chunk_ids,
+            "uploaded_at": datetime.now().isoformat()
         }
         self.files_metadata[file_id] = file_info
         self._save_metadata()
@@ -167,17 +170,36 @@ class RAGService:
         # Delete chunks from ChromaDB
         try:
             self.collection.delete(ids=file_info["chunk_ids"])
+            print(f"Deleted {len(file_info['chunk_ids'])} chunks from ChromaDB")
         except Exception as e:
             print(f"Error deleting chunks: {e}")
+
+        # Delete file from knowledge_base folder (try stored path first, then fallback)
+        deleted_file = False
+        paths_to_try = []
+
+        if file_info.get("file_path"):
+            paths_to_try.append(Path(file_info["file_path"]))
+
+        paths_to_try.append(KNOWLEDGE_BASE_DIR / file_info["filename"])
+
+        for file_path in paths_to_try:
+            try:
+                if file_path.exists():
+                    os.remove(file_path)
+                    print(f"Deleted file: {file_path}")
+                    deleted_file = True
+                    break
+            except Exception as e:
+                print(f"Error deleting file {file_path}: {e}")
+
+        if not deleted_file:
+            print(f"File not found on disk: {file_info['filename']}")
 
         # Delete from metadata
         del self.files_metadata[file_id]
         self._save_metadata()
-
-        # Delete file from knowledge_base folder
-        file_path = KNOWLEDGE_BASE_DIR / file_info["filename"]
-        if file_path.exists():
-            os.remove(file_path)
+        print(f"Deleted metadata for: {file_info['filename']}")
 
         return True
 

@@ -60,9 +60,6 @@ async def upload_file(file: UploadFile = File(...)):
         rag = get_rag_service()
         file_info = rag.add_document(str(file_path), safe_filename)
 
-        # Add upload timestamp
-        file_info["uploaded_at"] = datetime.now().isoformat()
-
         return {
             "success": True,
             "file": KnowledgeFile(
@@ -71,7 +68,7 @@ async def upload_file(file: UploadFile = File(...)):
                 file_type=file_info["file_type"],
                 file_size=file_info["file_size"],
                 chunk_count=file_info["chunk_count"],
-                uploaded_at=datetime.now()
+                uploaded_at=datetime.fromisoformat(file_info["uploaded_at"])
             )
         }
 
