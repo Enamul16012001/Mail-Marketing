@@ -67,3 +67,5 @@ frontend/dist/
 # Temporary files
 *.tmp
 *.temp
+number.txt
+prompt.txt
