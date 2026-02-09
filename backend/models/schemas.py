@@ -46,6 +46,7 @@ class EmailReply(BaseModel):
     to: str
     subject: str
     body: str
+    body_html: Optional[str] = None
     thread_id: Optional[str] = None
     message_id: Optional[str] = None  # For replying to specific message
 
@@ -56,6 +57,7 @@ class ComposeEmail(BaseModel):
     bcc: List[str] = []  # BCC recipients
     subject: str
     body: str
+    body_html: Optional[str] = None
 
 
 class Draft(BaseModel):

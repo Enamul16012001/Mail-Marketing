@@ -9,10 +9,12 @@ const api = axios.create({
   },
 });
 
-// Stats
+// ── Stats ───────────────────────────────────────────────────────
+
 export const getStats = () => api.get('/stats');
 
-// Emails
+// ── Emails ──────────────────────────────────────────────────────
+
 export const getPendingEmails = () => api.get('/emails/pending');
 export const getEmailHistory = (limit = 50) => api.get(`/emails/history?limit=${limit}`);
 export const getEmail = (id) => api.get(`/emails/${id}`);
@@ -21,14 +23,23 @@ export const dismissEmail = (id) => api.delete(`/emails/${id}`);
 export const triggerProcessing = () => api.post('/emails/process');
 export const composeEmail = (data) => api.post('/emails/compose', data);
 
-// Drafts
+// ── Bulk Actions ────────────────────────────────────────────────
+
+export const bulkDismiss = (emailIds) =>
+  api.post('/emails/bulk/dismiss', { email_ids: emailIds });
+export const bulkReply = (emailIds, response) =>
+  api.post('/emails/bulk/reply', { email_ids: emailIds, response });
+
+// ── Drafts ──────────────────────────────────────────────────────
+
 export const getPendingDrafts = () => api.get('/drafts');
 export const getDraft = (id) => api.get(`/drafts/${id}`);
 export const approveDraft = (id) => api.post(`/drafts/${id}/approve`);
 export const editDraft = (id, content) => api.put(`/drafts/${id}`, { content });
 export const discardDraft = (id) => api.delete(`/drafts/${id}`);
 
-// Knowledge Base
+// ── Knowledge Base ──────────────────────────────────────────────
+
 export const getKnowledgeFiles = () => api.get('/knowledge/files');
 export const uploadKnowledgeFile = (file) => {
   const formData = new FormData();
@@ -41,11 +52,36 @@ export const deleteKnowledgeFile = (id) => api.delete(`/knowledge/${id}`);
 export const searchKnowledge = (query) => api.post('/knowledge/search', { query });
 export const getKnowledgeStats = () => api.get('/knowledge/stats');
 
-// Settings
+// ── Search ──────────────────────────────────────────────────────
+
+export const searchEmails = (query, scope = 'all') =>
+  api.get(`/search?q=${encodeURIComponent(query)}&scope=${scope}`);
+
+// ── Analytics ───────────────────────────────────────────────────
+
+export const getAnalytics = (days = 30) => api.get(`/analytics?days=${days}`);
+
+// ── Blocklist ───────────────────────────────────────────────────
+
+export const getBlocklist = () => api.get('/blocklist');
+export const addBlocklistRule = (type, value, label = '') =>
+  api.post('/blocklist', { type, value, label });
+export const removeBlocklistRule = (index) => api.delete(`/blocklist/${index}`);
+export const testBlocklist = (email) => api.post('/blocklist/test', { email });
+
+// ── Retry Queue ─────────────────────────────────────────────────
+
+export const getRetryQueue = () => api.get('/retry');
+export const manualRetry = (id) => api.post(`/retry/${id}/retry`);
+export const cancelRetry = (id) => api.delete(`/retry/${id}`);
+
+// ── Settings ────────────────────────────────────────────────────
+
 export const getSettings = () => api.get('/settings');
 export const updateSettings = (settings) => api.post('/settings', settings);
 
-// Health
+// ── Health ──────────────────────────────────────────────────────
+
 export const healthCheck = () => api.get('/health');
 
 export default api;

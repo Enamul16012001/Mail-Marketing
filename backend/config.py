@@ -28,6 +28,9 @@ KNOWLEDGE_BASE_DIR.mkdir(exist_ok=True)
 # Email polling configuration
 POLLING_INTERVAL_MINUTES = int(os.getenv("POLLING_INTERVAL_MINUTES", "3"))
 
+# JWT configuration
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-in-production-use-a-random-secret")
+
 # Database path
 DATABASE_PATH = BACKEND_DIR / "data" / "email_data.db"
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)

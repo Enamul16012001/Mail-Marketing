@@ -5,6 +5,8 @@ from typing import Optional
 from models.schemas import Email, EmailCategory, EmailStatus, EmailReply
 from services.gmail_service import get_gmail_service
 from services.classifier import get_classifier
+from services.blocklist_service import get_blocklist_service
+from services.retry_service import get_retry_service
 from database import get_database
 
 
@@ -52,6 +54,7 @@ def process_new_emails() -> int:
     gmail = get_gmail_service()
     classifier = get_classifier()
     db = get_database()
+    blocklist = get_blocklist_service()
 
     # Get unread emails
     emails = gmail.get_unread_emails(max_results=20)
@@ -60,6 +63,17 @@ def process_new_emails() -> int:
     for email in emails:
         # Skip if already processed
         if db.is_email_processed(email.id):
+            continue
+
+        # Check sender blocklist
+        if blocklist.should_block(email.sender):
+            email.category = None
+            email.status = EmailStatus.REPLIED
+            email.ai_response = "[Blocked by sender filter]"
+            email.processed_at = datetime.now()
+            db.save_email(email)
+            gmail.mark_as_read(email.id)
+            processed_count += 1
             continue
 
         try:
@@ -74,6 +88,29 @@ def process_new_emails() -> int:
             db.save_email(email)
 
     return processed_count
+
+
+def _enqueue_retry(email: Email, response: str):
+    """Enqueue a failed send into the retry queue."""
+    try:
+        retry = get_retry_service()
+        subject = email.subject
+        if not subject.lower().startswith("re:"):
+            subject = f"Re: {subject}"
+
+        retry.add_to_queue(
+            email_id=email.id,
+            action="send_reply",
+            payload={
+                "to": email.sender,
+                "subject": subject,
+                "body": response,
+                "thread_id": email.thread_id,
+            },
+            error="Initial send failed"
+        )
+    except Exception as e:
+        print(f"Failed to enqueue retry for {email.id}: {e}")
 
 
 def process_single_email(
@@ -99,11 +136,10 @@ def process_single_email(
             message_id = gmail.reply_to_email(email, response)
             if message_id:
                 email.status = EmailStatus.REPLIED
-                # Mark original as read
                 gmail.mark_as_read(email.id)
             else:
-                # Failed to send, mark as manual
                 email.status = EmailStatus.MANUAL_REQUIRED
+                _enqueue_retry(email, response)
         else:
             email.status = EmailStatus.MANUAL_REQUIRED
 
@@ -116,6 +152,7 @@ def process_single_email(
                 gmail.mark_as_read(email.id)
             else:
                 email.status = EmailStatus.MANUAL_REQUIRED
+                _enqueue_retry(email, response)
         else:
             email.status = EmailStatus.MANUAL_REQUIRED
 

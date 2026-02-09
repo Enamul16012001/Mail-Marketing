@@ -183,7 +183,7 @@ class GmailService:
         return body.strip(), body_html, attachments
 
     def send_email(self, reply: EmailReply) -> Optional[str]:
-        """Send an email."""
+        """Send an email with optional HTML body."""
         try:
             message = MIMEMultipart("alternative")
             message["To"] = reply.to
@@ -193,6 +193,11 @@ class GmailService:
             # Add plain text body
             text_part = MIMEText(reply.body, "plain")
             message.attach(text_part)
+
+            # Add HTML body if provided
+            if reply.body_html:
+                html_part = MIMEText(reply.body_html, "html")
+                message.attach(html_part)
 
             # Encode and send
             encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -230,7 +235,7 @@ class GmailService:
         return self.send_email(reply)
 
     def send_composed_email(self, compose: ComposeEmail) -> Optional[str]:
-        """Send a composed email with CC/BCC support."""
+        """Send a composed email with CC/BCC support and optional HTML."""
         try:
             message = MIMEMultipart("alternative")
             message["From"] = self.user_email
@@ -246,6 +251,11 @@ class GmailService:
             # Add plain text body
             text_part = MIMEText(compose.body, "plain")
             message.attach(text_part)
+
+            # Add HTML body if provided
+            if compose.body_html:
+                html_part = MIMEText(compose.body_html, "html")
+                message.attach(html_part)
 
             # Encode and send
             encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -263,7 +273,7 @@ class GmailService:
             return None
 
     def create_draft(self, reply: EmailReply) -> Optional[str]:
-        """Create a draft email."""
+        """Create a draft email with optional HTML body."""
         try:
             message = MIMEMultipart("alternative")
             message["To"] = reply.to
@@ -272,6 +282,10 @@ class GmailService:
 
             text_part = MIMEText(reply.body, "plain")
             message.attach(text_part)
+
+            if reply.body_html:
+                html_part = MIMEText(reply.body_html, "html")
+                message.attach(html_part)
 
             encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 

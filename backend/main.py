@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import POLLING_INTERVAL_MINUTES
-from routes import emails, drafts, knowledge
+from routes import emails, drafts, knowledge, blocklist, retry, search, bulk, analytics
 from services.email_processor import get_polling_service, process_new_emails, initialize_system
 from services.rag_service import get_rag_service
 from database import get_database
@@ -26,6 +26,18 @@ def scheduled_email_check():
             print(f"Email check failed: {e}")
 
 
+def scheduled_retry_check():
+    """Scheduled task to process retry queue."""
+    try:
+        from services.retry_service import get_retry_service
+        retry_service = get_retry_service()
+        count = retry_service.process_retries()
+        if count > 0:
+            print(f"Processed {count} retries")
+    except Exception as e:
+        print(f"Retry check failed: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
@@ -41,7 +53,6 @@ async def lifespan(app: FastAPI):
     polling_service.start()
 
     # First-run initialization (marks existing emails as seen, won't reply to old emails)
-    # This is deferred and will happen on first poll if Gmail is authenticated
     try:
         initialize_system()
         print("Gmail initialized successfully")
@@ -55,8 +66,18 @@ async def lifespan(app: FastAPI):
         minutes=POLLING_INTERVAL_MINUTES,
         id='email_polling'
     )
+
+    # Schedule retry processing (every minute)
+    scheduler.add_job(
+        scheduled_retry_check,
+        'interval',
+        minutes=1,
+        id='retry_processing'
+    )
+
     scheduler.start()
     print(f"Email polling started (every {POLLING_INTERVAL_MINUTES} minutes)")
+    print("Retry processing started (every 1 minute)")
 
     yield
 
@@ -70,7 +91,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AI Email Auto-Reply System",
     description="Automated email response system using AI classification and RAG",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -87,6 +108,11 @@ app.add_middleware(
 app.include_router(emails.router)
 app.include_router(drafts.router)
 app.include_router(knowledge.router)
+app.include_router(blocklist.router)
+app.include_router(retry.router)
+app.include_router(search.router)
+app.include_router(bulk.router)
+app.include_router(analytics.router)
 
 
 @app.get("/")

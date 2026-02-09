@@ -3,13 +3,18 @@ import {
   CheckCircleIcon,
   EnvelopeIcon,
   ArrowPathIcon,
+  MagnifyingGlassIcon,
+  CodeBracketIcon,
 } from '@heroicons/react/24/outline';
-import { getEmailHistory } from '../services/api';
+import { getEmailHistory, searchEmails } from '../services/api';
 
 function EmailHistory() {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [showHtml, setShowHtml] = useState(false);
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -26,6 +31,22 @@ function EmailHistory() {
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      fetchHistory();
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const res = await searchEmails(searchQuery, 'history');
+      setEmails(res.data.results || []);
+    } catch (error) {
+      console.error('Search failed:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleString();
@@ -58,16 +79,40 @@ function EmailHistory() {
     <div className="flex gap-6 h-[calc(100vh-240px)]">
       {/* Email List */}
       <div className="w-1/3 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-medium text-gray-900">
-            Sent Emails ({emails.length})
-          </h2>
-          <button
-            onClick={fetchHistory}
-            className="p-2 text-gray-500 hover:text-gray-700"
-          >
-            <ArrowPathIcon className="h-5 w-5" />
-          </button>
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-medium text-gray-900">
+              Sent Emails ({emails.length})
+            </h2>
+            <button
+              onClick={() => { setSearchQuery(''); fetchHistory(); }}
+              className="p-2 text-gray-500 hover:text-gray-700"
+            >
+              <ArrowPathIcon className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="Search email history..."
+                className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={handleSearch}
+              disabled={isSearching}
+              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+            >
+              {isSearching ? '...' : 'Search'}
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -80,7 +125,7 @@ function EmailHistory() {
             emails.map((email) => (
               <div
                 key={email.id}
-                onClick={() => setSelectedEmail(email)}
+                onClick={() => { setSelectedEmail(email); setShowHtml(false); }}
                 className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${
                   selectedEmail?.id === email.id ? 'bg-green-50' : ''
                 }`}
@@ -127,10 +172,32 @@ function EmailHistory() {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Original Message */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Original Message:</h4>
-                <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                  {selectedEmail.body}
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-medium text-gray-700">Original Message:</h4>
+                  {selectedEmail.body_html && (
+                    <button
+                      onClick={() => setShowHtml(!showHtml)}
+                      className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                        showHtml ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      <CodeBracketIcon className="h-3 w-3" />
+                      {showHtml ? 'HTML' : 'Text'}
+                    </button>
+                  )}
+                </div>
+                {showHtml && selectedEmail.body_html ? (
+                  <iframe
+                    srcDoc={selectedEmail.body_html}
+                    sandbox=""
+                    className="w-full h-64 border rounded bg-white"
+                    title="Email HTML content"
+                  />
+                ) : (
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                    {selectedEmail.body}
+                  </p>
+                )}
               </div>
 
               {/* Our Response */}
