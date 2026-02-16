@@ -5,8 +5,9 @@ import {
   ArrowPathIcon,
   MagnifyingGlassIcon,
   CodeBracketIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
-import { getEmailHistory, searchEmails } from '../services/api';
+import { getEmailHistory, searchEmails, getThreadMessages } from '../services/api';
 
 function EmailHistory() {
   const [emails, setEmails] = useState([]);
@@ -15,6 +16,9 @@ function EmailHistory() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [showHtml, setShowHtml] = useState(false);
+  const [threadMessages, setThreadMessages] = useState([]);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [threadHtmlView, setThreadHtmlView] = useState({});
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -31,6 +35,25 @@ function EmailHistory() {
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  const handleSelectEmail = async (email) => {
+    setSelectedEmail(email);
+    setShowHtml(false);
+    setThreadMessages([]);
+    setThreadHtmlView({});
+
+    if (email.thread_id) {
+      setThreadLoading(true);
+      try {
+        const res = await getThreadMessages(email.thread_id);
+        setThreadMessages(res.data.messages || []);
+      } catch (error) {
+        console.error('Failed to fetch thread:', error);
+      } finally {
+        setThreadLoading(false);
+      }
+    }
+  };
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -125,7 +148,7 @@ function EmailHistory() {
             emails.map((email) => (
               <div
                 key={email.id}
-                onClick={() => { setSelectedEmail(email); setShowHtml(false); }}
+                onClick={() => handleSelectEmail(email)}
                 className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${
                   selectedEmail?.id === email.id ? 'bg-green-50' : ''
                 }`}
@@ -161,53 +184,110 @@ function EmailHistory() {
                 {getCategoryBadge(selectedEmail.category)}
               </div>
               <p className="text-sm text-gray-600">
-                From: {selectedEmail.sender_name || selectedEmail.sender}
+                Conversation with: {selectedEmail.sender_name || selectedEmail.sender}
               </p>
-              <p className="text-xs text-gray-400">
-                Received: {formatDate(selectedEmail.received_at)} •
-                Replied: {formatDate(selectedEmail.processed_at)}
-              </p>
+              {threadMessages.length > 1 && (
+                <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                  <ChatBubbleLeftRightIcon className="h-3.5 w-3.5" />
+                  {threadMessages.length} messages in this conversation
+                </p>
+              )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Original Message */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-medium text-gray-700">Original Message:</h4>
-                  {selectedEmail.body_html && (
-                    <button
-                      onClick={() => setShowHtml(!showHtml)}
-                      className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
-                        showHtml ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {threadLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : threadMessages.length > 1 ? (
+                /* Full conversation thread view */
+                threadMessages.map((msg, index) => {
+                  const isOurs = msg.from === 'me' ||
+                    msg.from.toLowerCase().includes(selectedEmail.recipient?.toLowerCase());
+                  const showingHtml = threadHtmlView[index];
+                  return (
+                    <div
+                      key={index}
+                      className={`rounded-lg p-4 ${
+                        isOurs ? 'bg-blue-50 ml-8' : 'bg-gray-50 mr-8'
                       }`}
                     >
-                      <CodeBracketIcon className="h-3 w-3" />
-                      {showHtml ? 'HTML' : 'Text'}
-                    </button>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-xs font-medium ${
+                          isOurs ? 'text-blue-700' : 'text-gray-700'
+                        }`}>
+                          {isOurs ? 'You' : msg.from}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {msg.body_html && (
+                            <button
+                              onClick={() => setThreadHtmlView(prev => ({ ...prev, [index]: !prev[index] }))}
+                              className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded ${
+                                showingHtml ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
+                              }`}
+                            >
+                              <CodeBracketIcon className="h-3 w-3" />
+                              {showingHtml ? 'HTML' : 'Text'}
+                            </button>
+                          )}
+                          <span className="text-xs text-gray-400">{msg.date}</span>
+                        </div>
+                      </div>
+                      {showingHtml && msg.body_html ? (
+                        <iframe
+                          srcDoc={msg.body_html}
+                          sandbox=""
+                          className="w-full h-48 border rounded bg-white"
+                          title={`Message ${index + 1} HTML`}
+                        />
+                      ) : (
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {msg.body}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                /* Fallback: single email view */
+                <>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-gray-700">Original Message:</h4>
+                      {selectedEmail.body_html && (
+                        <button
+                          onClick={() => setShowHtml(!showHtml)}
+                          className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                            showHtml ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
+                          }`}
+                        >
+                          <CodeBracketIcon className="h-3 w-3" />
+                          {showHtml ? 'HTML' : 'Text'}
+                        </button>
+                      )}
+                    </div>
+                    {showHtml && selectedEmail.body_html ? (
+                      <iframe
+                        srcDoc={selectedEmail.body_html}
+                        sandbox=""
+                        className="w-full h-64 border rounded bg-white"
+                        title="Email HTML content"
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                        {selectedEmail.body}
+                      </p>
+                    )}
+                  </div>
+                  {selectedEmail.ai_response && (
+                    <div className="bg-blue-50 rounded-lg p-4 ml-8">
+                      <h4 className="text-sm font-medium text-blue-700 mb-2">Our Response:</h4>
+                      <p className="text-sm text-blue-800 whitespace-pre-wrap">
+                        {selectedEmail.ai_response}
+                      </p>
+                    </div>
                   )}
-                </div>
-                {showHtml && selectedEmail.body_html ? (
-                  <iframe
-                    srcDoc={selectedEmail.body_html}
-                    sandbox=""
-                    className="w-full h-64 border rounded bg-white"
-                    title="Email HTML content"
-                  />
-                ) : (
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                    {selectedEmail.body}
-                  </p>
-                )}
-              </div>
-
-              {/* Our Response */}
-              {selectedEmail.ai_response && (
-                <div className="bg-green-50 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-green-800 mb-2">Our Response:</h4>
-                  <p className="text-sm text-green-700 whitespace-pre-wrap">
-                    {selectedEmail.ai_response}
-                  </p>
-                </div>
+                </>
               )}
             </div>
           </>
@@ -215,7 +295,7 @@ function EmailHistory() {
           <div className="flex-1 flex items-center justify-center text-gray-500">
             <div className="text-center">
               <EnvelopeIcon className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <p>Select an email to view details</p>
+              <p>Select an email to view conversation</p>
             </div>
           </div>
         )}

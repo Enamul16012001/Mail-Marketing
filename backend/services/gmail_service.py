@@ -13,6 +13,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+import markdown as md
+
 from config import GMAIL_CREDENTIALS_PATH, GMAIL_TOKEN_PATH, GMAIL_SCOPES
 from models.schemas import Email, EmailAttachment, EmailReply, ComposeEmail
 
@@ -39,6 +41,16 @@ class GmailService:
                     creds = None
 
             if not creds:
+                if not os.path.exists(GMAIL_CREDENTIALS_PATH):
+                    raise RuntimeError(
+                        f"Gmail credentials not found at {GMAIL_CREDENTIALS_PATH}. "
+                        "Run Gmail OAuth locally first (see README Step 3)."
+                    )
+                if os.getenv("DOCKER_CONTAINER"):
+                    raise RuntimeError(
+                        "Gmail token expired and cannot re-authenticate inside Docker. "
+                        "Delete credentials/token.json and re-run OAuth locally."
+                    )
                 flow = InstalledAppFlow.from_client_secrets_file(
                     GMAIL_CREDENTIALS_PATH, GMAIL_SCOPES
                 )
@@ -109,6 +121,7 @@ class GmailService:
             return Email(
                 id=message_id,
                 thread_id=message.get("threadId", ""),
+                message_id=header_dict.get("message-id"),
                 sender=sender,
                 sender_name=sender_name,
                 recipient=self.user_email,
@@ -190,13 +203,21 @@ class GmailService:
             message["From"] = self.user_email
             message["Subject"] = reply.subject
 
+            # Add threading headers for proper conversation grouping
+            if reply.message_id:
+                message["In-Reply-To"] = reply.message_id
+                message["References"] = reply.message_id
+
             # Add plain text body
             text_part = MIMEText(reply.body, "plain")
             message.attach(text_part)
 
-            # Add HTML body if provided
-            if reply.body_html:
-                html_part = MIMEText(reply.body_html, "html")
+            # Add HTML body (auto-convert from text if not provided)
+            body_html = reply.body_html
+            if not body_html and reply.body:
+                body_html = self._text_to_html(reply.body)
+            if body_html:
+                html_part = MIMEText(body_html, "html")
                 message.attach(html_part)
 
             # Encode and send
@@ -229,7 +250,8 @@ class GmailService:
             to=original_email.sender,
             subject=subject,
             body=response_body,
-            thread_id=original_email.thread_id
+            thread_id=original_email.thread_id,
+            message_id=original_email.message_id
         )
 
         return self.send_email(reply)
@@ -280,11 +302,20 @@ class GmailService:
             message["From"] = self.user_email
             message["Subject"] = reply.subject
 
+            # Add threading headers for proper conversation grouping
+            if reply.message_id:
+                message["In-Reply-To"] = reply.message_id
+                message["References"] = reply.message_id
+
             text_part = MIMEText(reply.body, "plain")
             message.attach(text_part)
 
-            if reply.body_html:
-                html_part = MIMEText(reply.body_html, "html")
+            # Add HTML body (auto-convert from text if not provided)
+            body_html = reply.body_html
+            if not body_html and reply.body:
+                body_html = self._text_to_html(reply.body)
+            if body_html:
+                html_part = MIMEText(body_html, "html")
                 message.attach(html_part)
 
             encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -347,6 +378,84 @@ class GmailService:
         except HttpError as error:
             print(f"Error marking as read: {error}")
             return False
+
+    def _text_to_html(self, text: str) -> str:
+        """Convert plain text to email-ready HTML with proper formatting."""
+        html_body = md.markdown(text)
+        return (
+            '<html><body style="font-family: Arial, sans-serif; '
+            f'line-height: 1.6; color: #333;">{html_body}</body></html>'
+        )
+
+    def get_thread_messages(self, thread_id: str) -> List[Dict[str, str]]:
+        """Fetch all messages in a thread for conversation context."""
+        try:
+            thread = self.service.users().threads().get(
+                userId="me",
+                id=thread_id,
+                format="full"
+            ).execute()
+
+            messages = []
+            for msg in thread.get("messages", []):
+                headers = msg.get("payload", {}).get("headers", [])
+                header_dict = {h["name"].lower(): h["value"] for h in headers}
+
+                sender = header_dict.get("from", "")
+                if "<" in sender:
+                    match = re.match(r"(.+?)\s*<(.+?)>", sender)
+                    if match:
+                        sender = match.group(1).strip().strip('"') or match.group(2)
+
+                body, body_html = self._extract_body_text_and_html(msg.get("payload", {}))
+
+                internal_date = int(msg.get("internalDate", 0)) / 1000
+                date_str = datetime.fromtimestamp(internal_date).strftime("%Y-%m-%d %H:%M")
+
+                messages.append({
+                    "from": sender,
+                    "date": date_str,
+                    "body": body[:1000],
+                    "body_html": body_html,
+                })
+
+            return messages
+        except HttpError as error:
+            print(f"Error fetching thread: {error}")
+            return []
+
+    def _extract_body_text_and_html(self, payload: Dict[str, Any]) -> tuple:
+        """Extract both plain text and HTML body from payload without downloading attachments."""
+        body = ""
+        body_html = ""
+
+        def process_part(part):
+            nonlocal body, body_html
+            mime_type = part.get("mimeType", "")
+            if mime_type == "text/plain":
+                data = part.get("body", {}).get("data", "")
+                if data:
+                    body = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+            elif mime_type == "text/html":
+                data = part.get("body", {}).get("data", "")
+                if data:
+                    body_html = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+            elif "parts" in part:
+                for sub_part in part["parts"]:
+                    process_part(sub_part)
+
+        if "body" in payload and payload.get("body", {}).get("data"):
+            body = base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="ignore")
+
+        if "parts" in payload:
+            for part in payload["parts"]:
+                process_part(part)
+
+        if not body and body_html:
+            body = re.sub(r"<[^>]+>", "", body_html)
+            body = body.replace("&nbsp;", " ").replace("&amp;", "&")
+
+        return body.strip(), body_html
 
     def get_attachment_content(self, message_id: str, attachment_id: str) -> Optional[bytes]:
         """Download attachment content."""

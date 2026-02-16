@@ -81,9 +81,10 @@ def process_new_emails() -> int:
             process_single_email(email, gmail, classifier, db)
         except Exception as e:
             print(f"Error processing email {email.id}: {e}")
-            # Save email as pending manual on error
+            # Save as pending manual so it's visible to the user
             email.category = EmailCategory.PENDING_MANUAL
             email.status = EmailStatus.MANUAL_REQUIRED
+            email.ai_response = f"[Processing failed: {str(e)[:200]}]"
             email.processed_at = datetime.now()
             db.save_email(email)
 
@@ -106,11 +107,31 @@ def _enqueue_retry(email: Email, response: str):
                 "subject": subject,
                 "body": response,
                 "thread_id": email.thread_id,
+                "message_id": email.message_id,
             },
             error="Initial send failed"
         )
     except Exception as e:
         print(f"Failed to enqueue retry for {email.id}: {e}")
+
+
+def _get_thread_history(gmail, email: Email) -> str:
+    """Fetch conversation history for the email's thread."""
+    if not email.thread_id:
+        return ""
+    try:
+        messages = gmail.get_thread_messages(email.thread_id)
+        if len(messages) <= 1:
+            return ""
+        # Exclude the last message (current email) since it's already in email.body
+        history = messages[:-1]
+        parts = []
+        for msg in history:
+            parts.append(f"[{msg['date']}] {msg['from']}:\n{msg['body']}")
+        return "\n\n---\n\n".join(parts)
+    except Exception as e:
+        print(f"Error fetching thread history: {e}")
+        return ""
 
 
 def process_single_email(
@@ -121,8 +142,11 @@ def process_single_email(
 ) -> None:
     """Process a single email."""
 
+    # Fetch conversation history for this thread
+    thread_history = _get_thread_history(gmail, email)
+
     # Classify and generate response
-    classification, response = classifier.process_email(email)
+    classification, response = classifier.process_email(email, thread_history)
 
     # Update email with classification
     email.category = classification.category
@@ -168,7 +192,8 @@ def process_single_email(
                 to=email.sender,
                 subject=subject,
                 body=response,
-                thread_id=email.thread_id
+                thread_id=email.thread_id,
+                message_id=email.message_id
             )
 
             gmail_draft_id = gmail.create_draft(reply)

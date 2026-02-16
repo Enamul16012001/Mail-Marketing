@@ -2,13 +2,24 @@
 
 Automated customer care email system powered by Google Gemini AI and RAG-based knowledge retrieval. Classifies incoming emails into 4 categories and handles them accordingly — from instant AI replies to flagging critical emails for manual review.
 
+## Features
+
+- **Smart Email Classification** — Auto Reply, RAG Reply, Draft Review, Manual Review
+- **RAG Knowledge Base** — Upload PDF/DOCX/TXT to improve AI responses
+- **Draft Review** — Edit AI drafts before sending
+- **Email Compose** — To/CC/BCC support
+- **Sender Blocklist** — Block noreply, newsletters, custom patterns
+- **Email Search** — Full-text search (SQLite FTS5)
+- **Bulk Actions** — Dismiss or reply to multiple emails at once
+- **Analytics Dashboard** — Volume charts, category breakdown, response times
+- **Retry Queue** — Auto-retry failed sends with exponential backoff
+- **HTML Email Support** — View and send HTML emails
 
 ## Prerequisites
 
-- **Python 3.10+**
-- **Node.js 18+**
-- **Docker & Docker Compose** (if running with Docker)
-- **Google Cloud Project** with Gmail API enabled
+- **Python 3.10+** and **Node.js 18+**
+- **Docker & Docker Compose** (optional)
+- **Gmail API** enabled in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 - **Gemini API Key** from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 ## Setup
@@ -19,112 +30,61 @@ Automated customer care email system powered by Google Gemini AI and RAG-based k
 git clone <repo-url>
 cd Mail_Marketing
 cp .env.example .env
+# Edit .env and set GEMINI_API_KEY
 ```
 
-Edit `.env` and add your Gemini API key:
+### Step 2: Gmail API Credentials
 
-```
-GEMINI_API_KEY=your_actual_key_here
-```
-
-### Step 2: Setup Gmail API Credentials
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Create a project (or select existing) and enable the **Gmail API**
-3. Go to **Credentials** > **Create Credentials** > **OAuth 2.0 Client ID**
-4. Application type: **Desktop App**
-5. Download the JSON file
-
-Place it in the project:
+1. In Google Cloud Console, enable **Gmail API**
+2. Create **OAuth 2.0 Client ID** (Desktop App)
+3. Download the JSON and place it:
 
 ```bash
 mkdir credentials
+mv ~/Downloads/client_secret_*.json credentials/credentials.json
 ```
-
-- **Linux/macOS:** `mv ~/Downloads/client_secret_*.json credentials/credentials.json`
-- **Windows:** `move %USERPROFILE%\Downloads\client_secret_*.json credentials\credentials.json`
 
 ### Step 3: Authenticate Gmail (One-Time)
 
-This must be done locally (not inside Docker) because it opens a browser for OAuth consent.
-
-**Linux/macOS:**
+Run locally (not in Docker) — opens a browser for OAuth:
 
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 GMAIL_CREDENTIALS_PATH=../credentials/credentials.json GMAIL_TOKEN_PATH=../credentials/token.json python -c "from services.gmail_service import get_gmail_service; get_gmail_service()"
+cd ..
 ```
 
-**Windows (PowerShell):**
+After authorizing in the browser, `token.json` is saved in `credentials/`. This only needs to be done once.
 
-```powershell
-cd backend
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-$env:GMAIL_CREDENTIALS_PATH="../credentials/credentials.json"
-$env:GMAIL_TOKEN_PATH="../credentials/token.json"
-python -c "from services.gmail_service import get_gmail_service; get_gmail_service()"
-```
+### Step 4: Run
 
-**Windows (CMD):**
-
-```cmd
-cd backend
-python -m venv .venv
-.venv\Scripts\activate.bat
-pip install -r requirements.txt
-set GMAIL_CREDENTIALS_PATH=../credentials/credentials.json
-set GMAIL_TOKEN_PATH=../credentials/token.json
-python -c "from services.gmail_service import get_gmail_service; get_gmail_service()"
-```
-
-A browser window will open for Google OAuth. After authorizing, a `token.json` file is saved in `credentials/`. This only needs to be done once.
-
-### Step 4: Run the Application
-
-#### Option A: Docker (Recommended)
+**Docker (Recommended):**
 
 ```bash
 docker compose up --build -d
+docker compose logs -f          # View logs
+docker compose down             # Stop
 ```
 
-Useful commands:
+**Manual (Without Docker):**
 
 ```bash
-docker compose logs -f        # View logs
-docker compose down            # Stop
-docker compose up --build -d   # Rebuild after code changes
-```
-
-#### Option B: Manual (Without Docker)
-
-**Terminal 1 — Backend:**
-
-```bash
+# Terminal 1 — Backend
 cd backend
-source .venv/bin/activate          # Linux/macOS
-# .venv\Scripts\Activate.ps1      # Windows PowerShell
-pip install -r requirements.txt
+source .venv/bin/activate
 uvicorn main:app --reload --port 8020
-```
 
-**Terminal 2 — Frontend:**
-
-```bash
+# Terminal 2 — Frontend
 cd frontend
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
 ### Step 5: Access
 
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:5173 |
-| API Docs | http://localhost:8020/docs |
+- **Frontend:** http://localhost:5173
+- **API Docs:** http://localhost:8020/docs
 
 ## Project Structure
 
@@ -174,11 +134,11 @@ Mail_Marketing/
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GEMINI_API_KEY` | Google Gemini API key | (required) |
-| `POLLING_INTERVAL_MINUTES` | Email check interval in minutes | `3` |
+| `POLLING_INTERVAL_MINUTES` | Email check interval (minutes) | `3` |
 
 ## Tech Stack
 
-- **Backend:** FastAPI, SQLite (FTS5), ChromaDB, Google Gemini, APScheduler
-- **Frontend:** React 18, Tailwind CSS, Recharts, Heroicons
-- **Email:** Gmail API (OAuth 2.0)
-- **Deployment:** Docker Compose
+**Backend:** FastAPI, SQLite (FTS5), ChromaDB, Google Gemini, APScheduler
+**Frontend:** React 18, Tailwind CSS, Recharts
+**Email:** Gmail API (OAuth 2.0)
+**Deployment:** Docker Compose

@@ -125,12 +125,16 @@ class RAGService:
 
         # Generate embeddings and add to ChromaDB
         chunk_ids = []
+        failed_embeddings = 0
         for i, chunk in enumerate(chunks):
             chunk_id = f"{file_id}_chunk_{i}"
             chunk_ids.append(chunk_id)
 
             # Get embeddings from AI service
             embeddings = self.ai_service.get_embeddings(chunk)
+
+            if not embeddings:
+                failed_embeddings += 1
 
             self.collection.add(
                 ids=[chunk_id],
@@ -143,6 +147,10 @@ class RAGService:
                     "total_chunks": len(chunks)
                 }]
             )
+
+        if failed_embeddings:
+            print(f"Warning: {failed_embeddings}/{len(chunks)} chunks added without embeddings for {filename}. "
+                  "Text search will still work, but semantic search may be degraded.")
 
         # Save file metadata
         file_info = {

@@ -28,6 +28,7 @@ class EmailAttachment(BaseModel):
 class Email(BaseModel):
     id: str
     thread_id: str
+    message_id: Optional[str] = None  # RFC 822 Message-ID header (for threading)
     sender: str
     sender_name: Optional[str] = None
     recipient: str

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   PaperAirplaneIcon,
   XMarkIcon,
@@ -7,6 +7,45 @@ import {
   ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import { composeEmail } from '../services/api';
+
+function FormattingToolbar({ onCommand }) {
+  const buttons = [
+    { cmd: 'bold', label: 'B', style: 'font-bold', title: 'Bold (Ctrl+B)' },
+    { cmd: 'italic', label: 'I', style: 'italic', title: 'Italic (Ctrl+I)' },
+    { cmd: 'underline', label: 'U', style: 'underline', title: 'Underline (Ctrl+U)' },
+    { cmd: 'strikeThrough', label: 'S', style: 'line-through', title: 'Strikethrough' },
+    { cmd: 'sep' },
+    { cmd: 'insertUnorderedList', label: '\u2022 List', style: '', title: 'Bullet list' },
+    { cmd: 'insertOrderedList', label: '1. List', style: '', title: 'Numbered list' },
+    { cmd: 'sep' },
+    { cmd: 'formatBlock:H3', label: 'H', style: 'font-bold text-base', title: 'Heading' },
+    { cmd: 'formatBlock:BLOCKQUOTE', label: '\u201C', style: 'text-lg', title: 'Quote' },
+    { cmd: 'removeFormat', label: 'Tx', style: 'text-gray-400', title: 'Clear formatting' },
+  ];
+
+  return (
+    <div className="flex items-center gap-1 px-3 py-2 border-b border-gray-200 bg-gray-50 rounded-t-md flex-wrap">
+      {buttons.map((btn, i) =>
+        btn.cmd === 'sep' ? (
+          <div key={i} className="w-px h-5 bg-gray-300 mx-1" />
+        ) : (
+          <button
+            key={btn.cmd}
+            type="button"
+            title={btn.title}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onCommand(btn.cmd);
+            }}
+            className={`px-2 py-1 text-sm rounded hover:bg-gray-200 ${btn.style}`}
+          >
+            {btn.label}
+          </button>
+        )
+      )}
+    </div>
+  );
+}
 
 // Moved outside to prevent re-creation on every render
 function RecipientField({ label, field, emails, onUpdate, onAdd, onRemove }) {
@@ -57,6 +96,17 @@ function EmailComposer() {
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
+  const editorRef = useRef(null);
+
+  const execCommand = useCallback((command) => {
+    if (command.startsWith('formatBlock:')) {
+      const tag = command.split(':')[1];
+      document.execCommand('formatBlock', false, tag);
+    } else {
+      document.execCommand(command, false, null);
+    }
+    editorRef.current?.focus();
+  }, []);
 
   const addRecipient = (field) => {
     setFormData((prev) => ({
@@ -84,13 +134,17 @@ function EmailComposer() {
     setError(null);
     setSuccess(null);
 
+    const editorHtml = editorRef.current?.innerHTML || '';
+    const editorText = editorRef.current?.innerText || '';
+
     // Filter out empty recipients
     const payload = {
       to: formData.to.filter((email) => email.trim()),
       cc: formData.cc.filter((email) => email.trim()),
       bcc: formData.bcc.filter((email) => email.trim()),
       subject: formData.subject,
-      body: formData.body,
+      body: editorText,
+      body_html: editorHtml.trim() ? `<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">${editorHtml}</body></html>` : undefined,
     };
 
     if (payload.to.length === 0) {
@@ -98,7 +152,7 @@ function EmailComposer() {
       return;
     }
 
-    if (!payload.body.trim()) {
+    if (!editorText.trim()) {
       setError('Email body is required');
       return;
     }
@@ -116,6 +170,7 @@ function EmailComposer() {
         subject: '',
         body: '',
       });
+      if (editorRef.current) editorRef.current.innerHTML = '';
       setShowCcBcc(false);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to send email');
@@ -213,18 +268,30 @@ function EmailComposer() {
           />
         </div>
 
-        {/* Body */}
+        {/* Body - Rich Text Editor */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Message
           </label>
-          <textarea
-            value={formData.body}
-            onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-            placeholder="Write your message here..."
-            rows={10}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          />
+          <div className="border border-gray-300 rounded-md focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+            <FormattingToolbar onCommand={execCommand} />
+            <div
+              ref={editorRef}
+              contentEditable
+              data-placeholder="Write your message here..."
+              className="min-h-[240px] px-3 py-2 text-sm outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400"
+              onPaste={(e) => {
+                e.preventDefault();
+                const html = e.clipboardData.getData('text/html');
+                const text = e.clipboardData.getData('text/plain');
+                if (html) {
+                  document.execCommand('insertHTML', false, html);
+                } else {
+                  document.execCommand('insertText', false, text);
+                }
+              }}
+            />
+          </div>
         </div>
 
         {/* Submit Button */}

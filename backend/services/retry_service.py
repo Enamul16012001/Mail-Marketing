@@ -40,16 +40,16 @@ class RetryService:
 
     def _retry_single(self, item: Dict, gmail):
         """Attempt a single retry."""
-        payload = json.loads(item["payload"])
         attempt = item["attempt_count"] + 1
 
         try:
+            payload = json.loads(item["payload"])
+
             if item["action"] == "send_reply":
                 reply = EmailReply(**payload)
                 message_id = gmail.send_email(reply)
                 if not message_id:
                     raise Exception("send_email returned None")
-                # Success
                 self.db.update_retry_status(item["id"], "succeeded")
                 self.db.update_email_status(
                     item["email_id"], EmailStatus.REPLIED, payload.get("body")
@@ -63,11 +63,15 @@ class RetryService:
                     if not message_id:
                         raise Exception("send_draft returned None")
                     self.db.update_retry_status(item["id"], "succeeded")
+                    self.db.update_email_status(
+                        item["email_id"], EmailStatus.REPLIED
+                    )
                     return
 
             raise Exception(f"Unknown action: {item['action']}")
 
         except Exception as e:
+            print(f"Retry failed for {item['id']}: {e}")
             if attempt >= item["max_attempts"]:
                 self.db.update_retry_status(item["id"], "failed")
             else:

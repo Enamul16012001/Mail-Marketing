@@ -15,14 +15,23 @@ class AIService:
         self.model = genai.GenerativeModel("gemini-2.5-flash")
         self.embedding_model = "models/gemini-embedding-001"
 
-    def classify_email(self, email: Email) -> ClassificationResult:
+    def classify_email(self, email: Email, thread_history: str = "") -> ClassificationResult:
         """Classify an email into one of four categories."""
+        thread_section = ""
+        if thread_history:
+            thread_section = f"""
+PREVIOUS CONVERSATION IN THIS THREAD:
+{thread_history[:3000]}
+
+---
+"""
+
         prompt = f"""Analyze this email and classify it into ONE of these categories:
 
-1. AUTO_REPLY: Generic/simple messages that don't need company knowledge or verification.
-   Examples: "Thank you", "OK", "Got it", "Noted", "Thanks for the info", simple acknowledgments.
+1. AUTO_REPLY: Generic/simple messages, general knowledge questions, or anything answerable from the conversation history alone.
+   Examples: "Thank you", "OK", "Got it", simple acknowledgments, "What did we discuss?", "What was our previous conversation?", general knowledge questions like "What is the capital of France?"
 
-2. RAG_REPLY: Questions about company information, products, policies, FAQs.
+2. RAG_REPLY: Questions specifically about THIS COMPANY's information, products, services, or policies that require company knowledge base lookup.
    Examples: "What are your business hours?", "How do I return a product?", "What's your refund policy?"
 
 3. PENDING_MANUAL: Critical issues that REQUIRE human attention.
@@ -30,8 +39,8 @@ class AIService:
 
 4. DRAFT_REVIEW: Questions the AI can answer but should be verified by staff first.
    Examples: Complex product questions, pricing inquiries, partnership requests, custom orders.
-
-EMAIL DETAILS:
+{thread_section}
+LATEST EMAIL (classify this one):
 From: {email.sender_name or email.sender}
 Subject: {email.subject}
 Body:
@@ -50,13 +59,11 @@ Only output the JSON, nothing else."""
             response = self.model.generate_content(prompt)
             result_text = response.text.strip()
 
-            # Clean up response if needed
-            if result_text.startswith("```json"):
-                result_text = result_text[7:]
-            if result_text.startswith("```"):
-                result_text = result_text[3:]
-            if result_text.endswith("```"):
-                result_text = result_text[:-3]
+            # Extract JSON from response (handle markdown wrapping)
+            import re as _re
+            json_match = _re.search(r'\{[^{}]*\}', result_text, _re.DOTALL)
+            if json_match:
+                result_text = json_match.group()
 
             result = json.loads(result_text.strip())
 
@@ -83,11 +90,21 @@ Only output the JSON, nothing else."""
                 reasoning=f"Classification failed: {str(e)}"
             )
 
-    def generate_generic_reply(self, email: Email) -> str:
+    def generate_generic_reply(self, email: Email, thread_history: str = "") -> str:
         """Generate a simple reply for generic emails."""
+        thread_section = ""
+        if thread_history:
+            thread_section = f"""
+PREVIOUS CONVERSATION:
+{thread_history[:2000]}
+
+---
+"""
+
         prompt = f"""Generate a brief, polite response to this simple email.
 Keep it professional but warm. 1-3 sentences max.
-
+Write in plain text only — no markdown formatting, no bold, no bullet points.
+{thread_section}
 From: {email.sender_name or email.sender}
 Subject: {email.subject}
 Body: {email.body[:500]}
@@ -101,12 +118,21 @@ Just write the response body, no subject line or signature."""
             print(f"Error generating generic reply: {e}")
             return "Thank you for your message. We appreciate you reaching out to us."
 
-    def generate_rag_reply(self, email: Email, context: str) -> str:
+    def generate_rag_reply(self, email: Email, context: str, thread_history: str = "") -> str:
         """Generate a reply using RAG context."""
+        thread_section = ""
+        if thread_history:
+            thread_section = f"""
+PREVIOUS CONVERSATION IN THIS THREAD:
+{thread_history[:3000]}
+
+---
+"""
+
         prompt = f"""You are a helpful customer service representative.
 Use the provided company knowledge to answer the customer's question.
 Be professional, accurate, and helpful.
-
+{thread_section}
 CUSTOMER EMAIL:
 From: {email.sender_name or email.sender}
 Subject: {email.subject}
@@ -116,10 +142,13 @@ COMPANY KNOWLEDGE BASE CONTEXT:
 {context}
 
 Instructions:
-- Answer based ONLY on the provided context
-- If the context doesn't contain relevant information, say you'll forward to the appropriate team
+- If the provided context contains relevant information, use it to answer
+- If the context is NOT relevant but you can confidently answer the question from general knowledge, go ahead and answer it directly
+- Only say you'll forward to the appropriate team if the question is company-specific and you truly cannot answer it
 - Be concise but complete
 - End with an offer to help further
+- Write in plain text only — no markdown formatting, no bold (**), no bullet points (- or *)
+- Use natural paragraph breaks instead of lists
 
 Write only the response body:"""
 
@@ -130,7 +159,7 @@ Write only the response body:"""
             print(f"Error generating RAG reply: {e}")
             return "Thank you for your question. Let me connect you with our team who can provide more detailed information."
 
-    def generate_draft_reply(self, email: Email, context: Optional[str] = None) -> str:
+    def generate_draft_reply(self, email: Email, context: Optional[str] = None, thread_history: str = "") -> str:
         """Generate a draft reply for review."""
         context_section = ""
         if context:
@@ -138,10 +167,18 @@ Write only the response body:"""
 AVAILABLE COMPANY INFORMATION:
 {context}
 """
+        thread_section = ""
+        if thread_history:
+            thread_section = f"""
+PREVIOUS CONVERSATION IN THIS THREAD:
+{thread_history[:3000]}
+
+---
+"""
 
         prompt = f"""Generate a professional response to this customer email.
 This will be reviewed by staff before sending, so be thorough but accurate.
-
+{thread_section}
 CUSTOMER EMAIL:
 From: {email.sender_name or email.sender}
 Subject: {email.subject}
@@ -153,6 +190,7 @@ Instructions:
 - If you're unsure about specific details, indicate [VERIFY: detail to verify]
 - Be helpful and offer to assist further
 - Use a professional but friendly tone
+- Write in plain text only — no markdown formatting, no bold (**), no bullet points (- or *)
 
 Write only the response body:"""
 

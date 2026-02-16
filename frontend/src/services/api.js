@@ -22,6 +22,7 @@ export const replyToEmail = (id, response) => api.post(`/emails/reply/${id}`, { 
 export const dismissEmail = (id) => api.delete(`/emails/${id}`);
 export const triggerProcessing = () => api.post('/emails/process');
 export const composeEmail = (data) => api.post('/emails/compose', data);
+export const getThreadMessages = (threadId) => api.get(`/emails/thread/${threadId}`);
 
 // ── Bulk Actions ────────────────────────────────────────────────
 

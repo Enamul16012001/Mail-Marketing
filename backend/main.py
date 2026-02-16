@@ -158,7 +158,13 @@ async def update_settings(settings: dict):
     db = get_database()
 
     if "polling_interval" in settings:
-        db.set_setting("polling_interval", str(settings["polling_interval"]))
+        try:
+            val = int(settings["polling_interval"])
+            if val < 1 or val > 1440:
+                return {"success": False, "error": "polling_interval must be between 1 and 1440 minutes"}
+            db.set_setting("polling_interval", str(val))
+        except (ValueError, TypeError):
+            return {"success": False, "error": "polling_interval must be a number"}
 
     if "auto_reply_enabled" in settings:
         db.set_setting("auto_reply_enabled", "true" if settings["auto_reply_enabled"] else "false")
@@ -198,4 +204,4 @@ async def manual_initialize():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8020, reload=True)

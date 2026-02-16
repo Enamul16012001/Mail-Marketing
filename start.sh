@@ -22,8 +22,8 @@ fi
 source venv/bin/activate
 pip install -r requirements.txt --quiet
 
-echo "Backend starting on http://localhost:8000"
-uvicorn main:app --host 0.0.0.0 --port 8000 &
+echo "Backend starting on http://localhost:8020"
+uvicorn main:app --host 0.0.0.0 --port 8020 &
 BACKEND_PID=$!
 
 cd ..
@@ -47,8 +47,8 @@ echo "============================================"
 echo "AI Email Auto-Reply System is running!"
 echo "============================================"
 echo "Frontend: http://localhost:5173"
-echo "Backend API: http://localhost:8000"
-echo "API Docs: http://localhost:8000/docs"
+echo "Backend API: http://localhost:8020"
+echo "API Docs: http://localhost:8020/docs"
 echo ""
 echo "Press Ctrl+C to stop both servers"
 

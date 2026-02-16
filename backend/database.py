@@ -48,6 +48,12 @@ class Database:
             except sqlite3.OperationalError:
                 pass
 
+            # Migration: add message_id column if missing (for email threading)
+            try:
+                cursor.execute("ALTER TABLE emails ADD COLUMN message_id TEXT")
+            except sqlite3.OperationalError:
+                pass
+
             # Drafts table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS drafts (
@@ -146,12 +152,13 @@ class Database:
 
             cursor.execute("""
                 INSERT OR REPLACE INTO emails
-                (id, thread_id, sender, sender_name, recipient, subject, body, body_html,
+                (id, thread_id, message_id, sender, sender_name, recipient, subject, body, body_html,
                  attachments, received_at, category, status, ai_response, processed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 email.id,
                 email.thread_id,
+                email.message_id,
                 email.sender,
                 email.sender_name,
                 email.recipient,
@@ -235,6 +242,13 @@ class Database:
                     WHERE id = ?
                 """, (status.value, datetime.now().isoformat(), email_id))
 
+            # Sync FTS index
+            cursor.execute("""
+                INSERT OR REPLACE INTO emails_fts(rowid, sender, sender_name, subject, body)
+                SELECT rowid, sender, COALESCE(sender_name, ''), COALESCE(subject, ''), COALESCE(body, '')
+                FROM emails WHERE id = ?
+            """, (email_id,))
+
             conn.commit()
             return cursor.rowcount > 0
 
@@ -252,6 +266,7 @@ class Database:
         return Email(
             id=row["id"],
             thread_id=row["thread_id"],
+            message_id=row["message_id"] if "message_id" in row.keys() else None,
             sender=row["sender"],
             sender_name=row["sender_name"],
             recipient=row["recipient"],

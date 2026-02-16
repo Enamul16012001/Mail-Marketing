@@ -33,6 +33,14 @@ async def get_email(email_id: str):
     return email
 
 
+@router.get("/thread/{thread_id}")
+async def get_thread_messages(thread_id: str):
+    """Get all messages in a conversation thread."""
+    gmail = get_gmail_service()
+    messages = gmail.get_thread_messages(thread_id)
+    return {"thread_id": thread_id, "messages": messages}
+
+
 @router.post("/reply")
 async def send_manual_reply(reply: EmailReply):
     """Send a manual reply to an email."""
