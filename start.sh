@@ -14,12 +14,12 @@ fi
 # Start backend
 echo "Starting backend server..."
 cd backend
-if [ ! -d "venv" ]; then
+if [ ! -d ".venv" ]; then
     echo "Creating Python virtual environment..."
-    python3 -m venv venv
+    python3 -m venv .venv
 fi
 
-source venv/bin/activate
+source .venv/bin/activate
 pip install -r requirements.txt --quiet
 
 echo "Backend starting on http://localhost:8020"

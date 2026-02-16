@@ -1,16 +1,10 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
 .Python
 .venv/
 venv/
 ENV/
 env/
-*.egg-info/
-dist/
-build/
 
 # Node.js
 node_modules/
@@ -20,8 +14,6 @@ yarn-error.log*
 
 # Environment variables
 .env
-.env.local
-.env.*.local
 
 # Credentials (IMPORTANT: Never commit these!)
 credentials.json
@@ -46,14 +38,6 @@ backend/data/
 
 # IDE
 .vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
 
 # Logs
 *.log
@@ -62,11 +46,5 @@ logs/
 # Docker
 .docker/
 
-# Build outputs
-frontend/dist/
-
-# Temporary files
-*.tmp
-*.temp
 number.txt
 prompt.txt

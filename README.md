@@ -2,18 +2,6 @@
 
 Automated customer care email system powered by Google Gemini AI and RAG-based knowledge retrieval. Classifies incoming emails into 4 categories and handles them accordingly — from instant AI replies to flagging critical emails for manual review.
 
-## Features
-
-- **Smart Email Classification** — Auto Reply, RAG Reply, Draft Review, Manual Review
-- **RAG Knowledge Base** — Upload PDF/DOCX/TXT to improve AI responses
-- **Draft Review** — Edit AI drafts before sending
-- **Email Compose** — To/CC/BCC support
-- **Sender Blocklist** — Block noreply, newsletters, custom patterns
-- **Email Search** — Full-text search (SQLite FTS5)
-- **Bulk Actions** — Dismiss or reply to multiple emails at once
-- **Analytics Dashboard** — Volume charts, category breakdown, response times
-- **Retry Queue** — Auto-retry failed sends with exponential backoff
-- **HTML Email Support** — View and send HTML emails
 
 ## Prerequisites
 
@@ -136,9 +124,3 @@ Mail_Marketing/
 | `GEMINI_API_KEY` | Google Gemini API key | (required) |
 | `POLLING_INTERVAL_MINUTES` | Email check interval (minutes) | `3` |
 
-## Tech Stack
-
-**Backend:** FastAPI, SQLite (FTS5), ChromaDB, Google Gemini, APScheduler
-**Frontend:** React 18, Tailwind CSS, Recharts
-**Email:** Gmail API (OAuth 2.0)
-**Deployment:** Docker Compose
